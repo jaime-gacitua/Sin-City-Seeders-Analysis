@@ -2,7 +2,8 @@
 title: "Analysis JG For Meeting #2"
 author: "Sin City Seeders"
 date: "October 16, 2016"
-output: html_document
+output: 
+  html_notebook: default
 ---
 
 
@@ -10,26 +11,221 @@ output: html_document
 ```{r setup, include=FALSE}
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+library(dplyr)
+library(DT)
+library(readr)
+library(readxl)
+library(plotly)
+
+```
+
+
+```{r, include=FALSE}
+experiment.data <- read_excel(path = '../data/EXPERIMENT DATA.xlsx', 
+                              sheet = "TRAINING_DATA", col_names = TRUE)
+
+```
+
+<center><h3>Head of dataset </h3></center>
+<BR>
+
+```{r, echo= FALSE}
+datatable(data = head(experiment.data, n = 1000))
+```
+
+<center><h3>Analysis</h3></center>
+<br>
+
+#### <span style="color:red"> Question: If a VARIETY is rejected in some stage, can it be used for a future experiment?
+</span>
+
+How do we know if a variety was rejected in some stage? Need a signal in the data (Kostas)
+
+#### <span style="color:green">Alternatively, "Gap in Years" analysis </span>
+
+For now, try to find a **gap in years** a variety's experiment and dig into that.
+
+Method:
+
+1. For each variety, find the YEARS that has experiments. (Eg. v000016: 2009, 2010, 2011)
+2. Discover if there are any gaps between the initial and final years (Eg. V000016: GAP = 0)
+3. If there are gaps, GAP = 1. Record in database.
+
+Output:
+
+
+```{r, echo= FALSE}
+## Calculate statistics at the variety level
+
+variety.years <- na.omit(unique(experiment.data[c("YEAR", "VARIETY", "CLASS_OF")]))
+varieties <- na.omit(unique(experiment.data[c("VARIETY")]))
+varieties <- varieties[order(varieties$VARIETY),]
+
+
+for(variety.temp.0 in varieties$VARIETY){
+  variety.temp <- as.character(variety.temp.0)
+  variety.years.temp <- subset(variety.years, VARIETY == variety.temp)
+  rYEARS.temp <- range(variety.years.temp$YEAR)
+  rnYEARS.temp <- seq(rYEARS.temp[1], rYEARS.temp[2])
+  gap.temp <- rnYEARS.temp[!rnYEARS.temp %in% variety.years.temp$YEAR]
+#  gap.temp <- c(2011)
+  if(length(gap.temp) == 0){
+    varieties[varieties$VARIETY == variety.temp,2] <- 0
+  } else {
+    varieties[varieties$VARIETY == variety.temp,2] <- 1
+  }
+  varieties[varieties$VARIETY == variety.temp,3] <- rYEARS.temp[1]
+  varieties[varieties$VARIETY == variety.temp,4] <- rYEARS.temp[2]
+  varieties[varieties$VARIETY == variety.temp,5] <- nrow(variety.years.temp)
+}
+names(varieties) <- c("VARIETY", "GAPS", "START", "END", "NUM.EXPERIMENTS")
+
+num.varieties <- nrow(varieties)
+
+num.gaps <- sum(varieties$GAPS)
+
 
 
 ```
 
-## 
+**There is a total of `r num.gaps` varieties with gaps in its experimentation process.**
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+`r varieties[varieties$GAPS == 1,] `
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+#### <span style="color:green"> Following 5 different varieties </span>
 
-```{r cars}
-summary(cars)
+To discover interesting varieties, for each variety, counted number of distinct years of experiments.
+<BR>
+<BR>
+
+```{r, echo= FALSE, fig.width= 10, fig.align='center'}
+
+p <- plot_ly(data = varieties, x = NUM.EXPERIMENTS, color = GAPS, type = "histogram")
+
+x.axis <- list(title = "Number of Years of Experimentation")
+y.axis <- list(title = "Count of varieties")
+p %>% layout(title = paste("Number of years of experimentation. Count:", num.varieties, "varieties."),
+             xaxis = x.axis, yaxis = y.axis)
+
+
 ```
 
-## Including Plots
+<br>
 
-You can also embed plots, for example:
+I will pick one variety from each stack from 2 to 6.
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r, echo= FALSE}
+
+varieties <- varieties[order(varieties$VARIETY, decreasing = TRUE),]
+
+variety2 <- varieties[varieties$NUM.EXPERIMENTS == 2,]
+variety2 <- as.character(variety2[1,1])
+
+variety3 <- varieties[varieties$NUM.EXPERIMENTS == 3,]
+variety3 <- as.character(variety3[1,1])
+
+variety4 <- varieties[varieties$NUM.EXPERIMENTS == 4,]
+variety4 <- as.character(variety4[1,1])
+
+variety5 <- varieties[varieties$NUM.EXPERIMENTS == 5,]
+variety5 <- as.character(variety5[1,1])
+
+variety6 <- varieties[varieties$NUM.EXPERIMENTS == 6,]
+variety6 <- as.character(variety6[1,1])
+
+# Plotting function
+plot.histogram <- function(experiment.data.input){
+
+  
+  experiment.data.aggr <- unique(experiment.data.input[c("YEAR", "EXPERIMENT", "LOCATION", "VARIETY", "CHECK")])
+    p <- plot_ly(data = experiment.data.aggr, x = YEAR, color = CHECK, type = "histogram", 
+                 nbinsx = max(experiment.data.aggr$YEAR) - min(experiment.data.aggr$YEAR) + 1)
+  x.axis <- list(title = "Year")
+  y.axis <- list(title = "Count of (Experiments,Location)")
+  p %>% layout(title = paste("Number of (Experiments,Location). Count:", nrow(experiment.data.aggr)),
+               xaxis = x.axis, yaxis = y.axis)
+}
+
+
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+The selected varieties are the following:
+
+Number of Years | Variety
+--------------- | -----------
+2               | `r variety2`
+3               | `r variety3`
+4               | `r variety4`
+5               | `r variety5`
+6               | `r variety6`
+
+<BR>
+
+### Variety with 2 years: `r variety2`
+<BR>
+
+```{r, echo= FALSE}
+experiment.data.2 <- experiment.data[experiment.data$VARIETY == variety2,]
+datatable(experiment.data.2)
+```
+<BR>
+```{r, echo= FALSE, fig.align='center'}
+plot.histogram(experiment.data.2)
+```
+
+
+
+### Variety with 3 years: `r variety3` (This seed has a gap in 2012!)
+<BR>
+```{r, echo= FALSE}
+experiment.data.3 <- experiment.data[experiment.data$VARIETY == variety3,]
+datatable(experiment.data.3)
+```
+
+```{r, echo= FALSE, fig.align='center'}
+plot.histogram(experiment.data.3)
+```
+
+<BR>
+
+### Variety with 4 years: `r variety4`
+<BR>
+```{r, echo= FALSE}
+experiment.data.4 <- experiment.data[experiment.data$VARIETY == variety4,]
+datatable(experiment.data.4)
+```
+
+```{r, echo= FALSE, fig.align='center'}
+plot.histogram(experiment.data.4)
+```
+<BR>
+
+### Variety with 5 years: `r variety5`
+<BR>
+```{r, echo= FALSE}
+experiment.data.5 <- experiment.data[experiment.data$VARIETY == variety5,]
+datatable(experiment.data.5)
+```
+```{r, echo= FALSE, fig.align='center'}
+plot.histogram(experiment.data.5)
+```
+
+<BR>
+
+### Variety with 6 years: `r variety6`
+<BR>
+
+```{r, echo= FALSE}
+experiment.data.6 <- experiment.data[experiment.data$VARIETY == variety6,]
+datatable(experiment.data.6)
+```
+
+```{r, echo= FALSE, fig.align='center'}
+plot.histogram(experiment.data.6)
+```
+
+
+
