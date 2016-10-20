@@ -1,0 +1,144 @@
+---
+title: "Experiment Tree Analysis"
+author: "Sin City Seeders"
+date: "October 17, 2016"
+output: 
+  html_notebook: default
+---
+
+
+```{r setup, include=FALSE}
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(out.width='750px', dpi=200)
+
+```
+
+```{r, include=FALSE}
+library(dplyr)
+library(DT)
+library(readr)
+library(plotly)
+library(reshape2)
+library(readxl)
+```
+
+
+```{r, include=FALSE}
+experiment.data.tree <- read_csv("../data/exp_data_final.csv", 
+                                 col_types = cols(
+                                   LOCATION = col_character()
+                                 ))
+```
+
+
+<br>
+<br>
+<br>
+
+<H3><CENTER>High Level Table</H3></CENTER>
+Understanding how many unique varieties are present in each stage of each tree
+
+**Remember that 80%+ of varieties are discarded in every stage.**
+<br>
+<br>
+
+<CENTER>Rows: STARTING_YEAR, Columns: STAGE</CENTER>
+
+
+```{r, echo=FALSE}
+uniques.count <- group_by(experiment.data.tree, STARTING_YEAR, STAGE)
+uniques.count <- summarise(uniques.count, count.varieties = n_distinct(VARIETY))
+uniques.count.transpose <- dcast(uniques.count, STARTING_YEAR ~ STAGE, value.var = "count.varieties")
+
+total.varieties.stage.1 <- sum(uniques.count.transpose$`1`)
+total.varieties.not.check <- nrow(unique(experiment.data.tree["VARIETY"]))
+datatable(uniques.count.transpose)
+
+
+
+plot.tree.evolution.histogram <- function(starting.year){
+  experiment.data.tree.year <- experiment.data.tree[experiment.data.tree$STARTING_YEAR == starting.year,]
+  experiment.data.tree.year.uniques <- unique(experiment.data.tree.year[c("YEAR", "VARIETY", "QUALIFIED", "CHECK")])
+  
+  total.varieties <- nrow(experiment.data.tree.year.uniques[experiment.data.tree.year.uniques$YEAR == starting.year,])
+  
+  
+  p <- plot_ly(data=experiment.data.tree.year.uniques, x = YEAR, color = QUALIFIED, type = "histogram")
+  
+  x.axis <- list(title = "Year")
+  y.axis <- list(title = "Count of Varieties")
+  
+  p <- p %>% layout(title = paste0("Count of Unique Varieties Tested per year. <br> Starting year: ",starting.year,
+                             ". Total Varieties: ", total.varieties),
+               xaxis = x.axis, 
+               yaxis = y.axis,
+               barmode = "stack")
+  
+  dt <- datatable(experiment.data.tree.year.uniques)
+
+  htmltools::tagList(list(as.widget(p), as.widget(dt)))
+  
+}
+
+```
+
+<br>
+<br>
+
+<UL>
+<LI> Very few varieties qualify in each year! For example, for 2009 Stage 1, 71 / 1789 = 4% qualified.</LI> 
+<LI> This datatable has a total of `r total.varieties.stage.1` unique varieties in stage 1. </LI>
+<LI> There is a total of `r total.varieties.not.check` unique varieties in the exp_data_final database. </LI> 
+<LI> There could be `r (total.varieties.stage.1 - total.varieties.not.check)` varieties duplicated. </LI>
+<LI> This represents `r round((total.varieties.stage.1 - total.varieties.not.check) / total.varieties.not.check, digits = 4)*100`% of the varieties. </LI>
+</UL>
+
+
+<br>
+<br>
+
+***
+<H3><CENTER>Histograms for each STARTING_YEAR </CENTER></H3>
+***
+
+```{r, echo=FALSE, fig.align='center', warning=FALSE}
+plot.tree.evolution.histogram(2009)
+plot.tree.evolution.histogram(2010)
+plot.tree.evolution.histogram(2011)
+plot.tree.evolution.histogram(2012)
+plot.tree.evolution.histogram(2013)
+plot.tree.evolution.histogram(2014)
+```
+
+
+<H3><CENTER>Discussion, Further Work</H3></CENTER>
+
+
+* **[POSITIVE] The bulk of the data seems to follow INFORMS' story.**
+    + In all trees, seeds are filtered every year, and very few qualify.
+* [FURTHER WORK] Have the full experiment database, with this 3 new columns. 
+    + This is a subset of the entire database.
+    + Elements used as check maybe just keep these 3 columns blank.
+* [FURTHER WORK] With these new columns, can we now explain the missing values of CLASS_OF and GRAD?  
+* [FURTHER WORK] With these new columns, can we now explain the missing values of CLASS_OF and GRAD?
+* [FURTHER WORK] In 2012, 2014 we have some varieties with no data in QUALIFIED
+    + In 2012 means those are the seeds WE have to make the decision?
+    + Contrast Varieties present in START_YEAR = 2012, STAGE = 3, with the list of varieties with the EVALUATION SET.
+* [FURTHER WORK] Why are we even testing in stage 1 of 2013, 2014 ? 
+
+
+
+```{r, echo=FALSE, fig.align='center', warning=FALSE}
+full.dataset <-  read_excel(path = '../data/EXPERIMENT DATA.xlsx', 
+                              sheet = "TRAINING_DATA", col_names = TRUE)
+
+
+relevant.columns <- names(full.dataset)
+relevant.columns <- relevant.columns[relevant.columns != "YIELD"]
+full.dataset.relevant <- full.dataset[,relevant.columns]
+experiment.data.tree.relevant <- experiment.data.tree[,relevant.columns]
+
+```
+
+
